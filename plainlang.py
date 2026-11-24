@@ -1607,6 +1607,107 @@ def compile_plain_file(plain_path=None, log_callback=print):
 
 
 class PlainLangStudio:
+    SNIPPETS = [
+        "Print ",
+        "Set  to ",
+        "Set key  of  to ",
+        "Add  to ",
+        "Subtract  from ",
+        "Multiply  by  into ",
+        "Divide  by  into ",
+        "Modulo  by  into ",
+        "Pick random between  and  and save to ",
+        "Ask  and save to ",
+        "Show popup ",
+        "Create list ",
+        "Create object ",
+        "Append  to ",
+        "Pop from  into ",
+        "Get item  of  into ",
+        "Length of  into ",
+        "Sort list ",
+        "Reverse list ",
+        "Remove  from ",
+        "For each  in \n\t\nEnd",
+        "If  equals \n\t\nEnd",
+        "Else if  equals \n\t\nEnd",
+        "Else\n\t\nEnd",
+        "While  is less than \n\t\nEnd",
+        "Repeat  times\n\t\nEnd",
+        "Define  with \n\tReturn \nEnd",
+        "Do ",
+        "Try\n\t\nCatch\n\t\nEnd",
+        "Uppercase  into ",
+        "Lowercase  into ",
+        "Trim  into ",
+        "Split  by space into ",
+        "Join  with space into ",
+        "Replace  with  in  into ",
+        "Parse json  into ",
+        "To json  into ",
+        "Save  to ",
+        "Load  into ",
+        "Check file  and save to ",
+        "Fetch  and save to ",
+        "Run command  and save to ",
+        "Get current time into ",
+        "Wait  seconds",
+        "Call  with  into ",
+        "Absolute value of  into ",
+        "Round  into ",
+        "Power  to  into ",
+        "Divmod  by  into ",
+        "Maximum of  into ",
+        "Minimum of  into ",
+        "Sum of  into ",
+        "Range from  to  into ",
+        "Convert  to  into ",
+        "Character of  into ",
+        "Unicode of  into ",
+        "Type of  into ",
+        "Hash of  into ",
+        "Id of  into ",
+        "Check all  into ",
+        "Check any  into ",
+        "Enumerate  into ",
+        "Zip  into ",
+        "Reverse  into ",
+        "Sort  into ",
+        "Slice  from  to  into ",
+        "Has attribute  of  into ",
+        "Get attribute  of  into ",
+        "Set attribute  of  to ",
+        "Delete attribute  of ",
+        "Check callable  into ",
+        "Check instance of  as  into ",
+        "Check subclass of  as  into ",
+        "Iterate  into ",
+        "Next item of  into ",
+        "Format  with  into ",
+        "Open file  mode  into ",
+        "Help on  into ",
+        "Eval python  into ",
+        "Run python  into ",
+        "Filter  with  into ",
+        "Map  with  into ",
+        "Import module  into ",
+        "Globals into ",
+        "Locals into ",
+        "Dir of  into ",
+        "Vars of  into ",
+        "Memoryview of  into ",
+        "Object into ",
+        "Super into ",
+        "Property  into ",
+        "Classmethod ",
+        "Staticmethod ",
+        "Breakpoint",
+        "Break",
+        "Continue",
+        "Return ",
+        "End",
+    ]
+
     SAMPLE_CODE = """# PlainLang Zero-Quotes Builtins Demo
 Absolute value of -42 into abs_val
 Print Abs: abs_val
@@ -1629,8 +1730,8 @@ Print Count: count_val Type: nums_type
 
     def __init__(self, initial_file=None):
         self.root = tk.Tk()
-        self.root.title("PlainLang Studio — Zero-Quotes Builtins Runtime")
-        self.root.geometry("1040x700")
+        self.root.title("PlainLang Studio")
+        self.root.geometry("1000x680")
         self.root.configure(bg="#1e1e1e")
 
         self.current_file = initial_file
@@ -1640,6 +1741,9 @@ Print Count: count_val Type: nums_type
             popup_callback=self.show_popup_threadsafe,
         )
         self.worker_thread = None
+        self.popup_win = None
+        self.popup_list = None
+        self._autofill_items = []
 
         self._build_ui()
         if initial_file and os.path.exists(initial_file):
@@ -1653,10 +1757,8 @@ Print Count: count_val Type: nums_type
         toolbar.pack(fill=tk.X)
 
         btn_style = {"bg": "#333333", "fg": "#ffffff", "relief": tk.FLAT, "padx": 10, "pady": 4}
-        tk.Button(toolbar, text="New", command=self.new_file, **btn_style).pack(side=tk.LEFT, padx=3)
-        tk.Button(toolbar, text="Open .plain", command=self.open_file, **btn_style).pack(side=tk.LEFT, padx=3)
+        tk.Button(toolbar, text="Open", command=self.open_file, **btn_style).pack(side=tk.LEFT, padx=3)
         tk.Button(toolbar, text="Save", command=self.save_file, **btn_style).pack(side=tk.LEFT, padx=3)
-        tk.Button(toolbar, text="Save As...", command=self.save_file_as, **btn_style).pack(side=tk.LEFT, padx=3)
 
         tk.Button(
             toolbar, text="Run (F5)", command=self.run_script,
@@ -1678,7 +1780,7 @@ Print Count: count_val Type: nums_type
 
         editor_frame = tk.Frame(paned, bg="#1e1e1e")
         tk.Label(
-            editor_frame, text="PLAINLANG EDITOR", bg="#1e1e1e", fg="#9cdcfe",
+            editor_frame, text="EDITOR (Ctrl+Space for Autofill)", bg="#1e1e1e", fg="#9cdcfe",
             font=("Segoe UI", 9, "bold"), anchor="w"
         ).pack(fill=tk.X, pady=(0, 4))
 
@@ -1688,9 +1790,12 @@ Print Count: count_val Type: nums_type
             selectbackground="#264f78", undo=True, padx=10, pady=10,
         )
         self.editor.pack(fill=tk.BOTH, expand=True)
-        self.editor.bind("<KeyRelease>", lambda e: self.highlight_syntax())
+        self.editor.bind("<KeyPress>", self._on_key_press)
+        self.editor.bind("<KeyRelease>", self._on_key_release)
+        self.editor.bind("<FocusOut>", lambda e: self.root.after(150, self._hide_autofill))
         self.root.bind("<F5>", lambda e: self.run_script())
         self.root.bind("<Control-s>", lambda e: self.save_file())
+        self.root.bind("<Control-space>", lambda e: self._show_autofill(force=True))
 
         self.editor.tag_configure("keyword", foreground="#569cd6", font=("Consolas", 12, "bold"))
         self.editor.tag_configure("control", foreground="#c586c0", font=("Consolas", 12, "bold"))
@@ -1704,7 +1809,7 @@ Print Count: count_val Type: nums_type
         hdr = tk.Frame(console_frame, bg="#1e1e1e")
         hdr.pack(fill=tk.X, pady=(0, 4))
         tk.Label(
-            hdr, text="LIVE OUTPUT CONSOLE", bg="#1e1e1e", fg="#4ec9b0",
+            hdr, text="OUTPUT", bg="#1e1e1e", fg="#4ec9b0",
             font=("Segoe UI", 9, "bold")
         ).pack(side=tk.LEFT)
         tk.Button(
@@ -1717,11 +1822,11 @@ Print Count: count_val Type: nums_type
             bg="#141414", fg="#cccccc", state=tk.DISABLED, padx=8, pady=8,
         )
         self.console.pack(fill=tk.BOTH, expand=True)
-        right_paned.add(console_frame, height=390)
+        right_paned.add(console_frame, height=400)
 
         vars_frame = tk.Frame(right_paned, bg="#1e1e1e")
         tk.Label(
-            vars_frame, text="LIVE VARIABLES & OBJECTS", bg="#1e1e1e", fg="#dcdcaa",
+            vars_frame, text="VARIABLES", bg="#1e1e1e", fg="#dcdcaa",
             font=("Segoe UI", 9, "bold"), anchor="w"
         ).pack(fill=tk.X, pady=(0, 4))
 
@@ -1738,15 +1843,146 @@ Print Count: count_val Type: nums_type
         self.var_tree.column("value", width=160)
         self.var_tree.column("type", width=70)
         self.var_tree.pack(fill=tk.BOTH, expand=True)
-        right_paned.add(vars_frame, height=220)
+        right_paned.add(vars_frame, height=210)
 
         paned.add(right_paned)
 
-        self.status_var = tk.StringVar(value="Ready — PlainLang Zero-Quotes Builtins Runtime")
+        self.status_var = tk.StringVar(value="Ready")
         tk.Label(
             self.root, textvariable=self.status_var, bg="#007acc", fg="#ffffff",
             anchor="w", padx=10, pady=3, font=("Segoe UI", 9)
         ).pack(fill=tk.X)
+
+    def _current_prefix_info(self):
+        line_str = self.editor.get("insert linestart", "insert")
+        stripped = line_str.lstrip()
+        word_start = len(line_str)
+        while word_start > 0 and not line_str[word_start - 1].isspace():
+            word_start -= 1
+        return stripped, line_str[word_start:], word_start
+
+    def _dynamic_symbols(self):
+        names = set(self.engine.functions.keys())
+        names.update(self.engine.variables.keys())
+        for line in self.editor.get("1.0", tk.END).splitlines():
+            s = line.strip()
+            low = s.lower()
+            if low.startswith("set ") and " to " in low:
+                names.add(s[4:].split(" to ", 1)[0].strip())
+            elif low.startswith("create list "):
+                names.add(s[12:].strip())
+            elif low.startswith("create object "):
+                names.add(s[14:].strip())
+            elif low.startswith("define "):
+                raw = s[7:].strip()
+                fn_name = raw[: raw.lower().index(" with ")].strip() if " with " in raw.lower() else raw
+                names.add(fn_name)
+        return sorted(n for n in names if n)
+
+    def _show_autofill(self, force=False):
+        line_prefix, word_prefix, _ = self._current_prefix_info()
+        query = (line_prefix if " " not in line_prefix else word_prefix).lower()
+
+        if not force and len(query) < 2:
+            self._hide_autofill()
+            return
+
+        candidates = []
+        if " " not in line_prefix:
+            for snip in self.SNIPPETS:
+                if snip.splitlines()[0].lower().startswith(query):
+                    candidates.append(snip)
+
+        for sym in self._dynamic_symbols():
+            if query and sym.lower().startswith(query) and sym not in candidates:
+                candidates.append(sym)
+
+        if not candidates:
+            self._hide_autofill()
+            return
+
+        bbox = self.editor.bbox("insert")
+        if not bbox:
+            return
+        x_pos = self.editor.winfo_rootx() + bbox[0]
+        y_pos = self.editor.winfo_rooty() + bbox[1] + bbox[3] + 2
+
+        if not self.popup_win or not self.popup_win.winfo_exists():
+            self.popup_win = tk.Toplevel(self.root)
+            self.popup_win.wm_overrideredirect(True)
+            self.popup_win.configure(bg="#252526", bd=1, relief=tk.SOLID)
+            self.popup_list = tk.Listbox(
+                self.popup_win,
+                font=("Consolas", 11),
+                bg="#252526",
+                fg="#ffffff",
+                selectbackground="#094771",
+                selectforeground="#ffffff",
+                activestyle="none",
+                height=min(7, len(candidates)),
+                width=38,
+            )
+            self.popup_list.pack(fill=tk.BOTH, expand=True)
+            self.popup_list.bind("<Double-Button-1>", lambda e: self._accept_autofill())
+            self.popup_list.bind("<Return>", lambda e: self._accept_autofill())
+
+        self.popup_list.delete(0, tk.END)
+        for c in candidates:
+            self.popup_list.insert(tk.END, c.splitlines()[0] + (" [...]" if "\n" in c else ""))
+        self.popup_list.selection_set(0)
+        self.popup_win.geometry(f"+{x_pos}+{y_pos}")
+        self.popup_win.deiconify()
+        self._autofill_items = candidates
+
+    def _hide_autofill(self):
+        if self.popup_win and self.popup_win.winfo_exists():
+            self.popup_win.withdraw()
+
+    def _accept_autofill(self):
+        if not (self.popup_win and self.popup_win.winfo_viewable()):
+            return False
+        sel = self.popup_list.curselection()
+        if not sel:
+            return False
+        chosen = self._autofill_items[sel[0]]
+        line_prefix, _, word_start = self._current_prefix_info()
+
+        if " " not in line_prefix:
+            full_line = self.editor.get("insert linestart", "insert")
+            indent = full_line[: len(full_line) - len(full_line.lstrip())]
+            self.editor.delete("insert linestart", "insert")
+            formatted = chosen.replace("\n\t", f"\n{indent}    ")
+            self.editor.insert("insert", indent + formatted)
+        else:
+            line_idx = self.editor.index("insert").split(".")[0]
+            self.editor.delete(f"{line_idx}.{word_start}", "insert")
+            self.editor.insert("insert", chosen)
+
+        self._hide_autofill()
+        self.highlight_syntax()
+        return True
+
+    def _on_key_press(self, event):
+        if self.popup_win and self.popup_win.winfo_viewable():
+            if event.keysym == "Escape":
+                self._hide_autofill()
+                return "break"
+            if event.keysym in ("Tab", "Return"):
+                if self._accept_autofill():
+                    return "break"
+            if event.keysym in ("Down", "Up"):
+                cur = self.popup_list.curselection()
+                idx = cur[0] if cur else 0
+                nxt = min(self.popup_list.size() - 1, idx + 1) if event.keysym == "Down" else max(0, idx - 1)
+                self.popup_list.selection_clear(0, tk.END)
+                self.popup_list.selection_set(nxt)
+                self.popup_list.see(nxt)
+                return "break"
+
+    def _on_key_release(self, event):
+        if event.keysym not in ("Up", "Down", "Left", "Right", "Escape", "Tab", "Return", "Control_L", "Control_R"):
+            self._show_autofill(force=False)
+        self.highlight_syntax()
 
     def highlight_syntax(self):
         for tag in ("keyword", "control", "comment"):
@@ -1803,7 +2039,6 @@ Print Count: count_val Type: nums_type
             self.console.insert(tk.END, text + "\n")
             self.console.see(tk.END)
             self.console.configure(state=tk.DISABLED)
-            self.refresh_variables()
 
         self.root.after(0, _write)
 

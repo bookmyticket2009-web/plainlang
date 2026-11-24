@@ -1,0 +1,9 @@
+Create list tasks
+Append Buy milk to tasks
+Append Finish PlainLang build to tasks
+Append Test todo.plain in exe to tasks
+Save tasks to my_tasks.txt
+
+For each item in tasks
+    Print Todo: item
+End

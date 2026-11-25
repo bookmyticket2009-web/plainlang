@@ -1,0 +1,3 @@
+[console_scripts]
+plainlang = plainlang.cli:main
+plainlang-studio = plainlang.cli:launch_studio

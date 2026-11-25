@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ["C:/Users/Miti Shah/Desktop/prasheel's_stuff/personel/Programming Language/_plainlang_entry.py"],
+    ['plainlang-pkg/src/plainlang/cli.py'],
     pathex=[],
     binaries=[],
     datas=[],

@@ -1,0 +1,22 @@
+{
+  "packages": {
+    "typing_extensions": {
+      "type": "plain-pypi-dep",
+      "version": "4.16.0",
+      "source": "pypi-dep:fastapi",
+      "path": "C:\\Users\\Miti Shah\\Desktop\\prasheel's_stuff\\personel\\Programming language\\.pvenv\\packages\\typing_extensions.plain",
+      "dependencies": [],
+      "installed_at": "2026-11-25T15:21:43"
+    },
+    "pydantic_core": {
+      "type": "plain-pypi-dep",
+      "version": "2.46.4",
+      "source": "pypi-dep:fastapi",
+      "path": "C:\\Users\\Miti Shah\\Desktop\\prasheel's_stuff\\personel\\Programming language\\.pvenv\\packages\\pydantic_core.plain",
+      "dependencies": [
+        "typing-extensions"
+      ],
+      "installed_at": "2026-11-25T15:21:43"
+    }
+  }
+}

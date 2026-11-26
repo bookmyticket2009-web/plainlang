@@ -14,8 +14,10 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, scrolledtext, simpledialog, ttk
 import urllib.request
 
-from .env_jarvis import find_pvenv
-
+try:
+    from .env_jarvis import ENV_DIR_NAME, ensure_pvenv, find_pvenv, jarvis_main
+except ImportError:
+    from env_jarvis import ENV_DIR_NAME, ensure_pvenv, find_pvenv, jarvis_main
 
 BUILTIN_FUNCTIONS = [
     "abs",
@@ -2235,14 +2237,33 @@ def launch_studio():
     PlainLangStudio().start()
 
 
+def _print_help():
+    print("PlainLang CLI & Studio")
+    print("Usage:")
+    print("  plainlang                         Launch PlainLang Studio IDE")
+    print("  plainlang --studio [file.plain]   Launch PlainLang Studio IDE")
+    print("  plainlang <file.plain>            Run a PlainLang script")
+    print("  plainlang jarvis <command> ...    Run jarvis package manager")
+    print("  plainlang -m jarvis <command> ... Run jarvis package manager")
+    print("  plainlang -m pvenv [dir]          Create or locate .pvenv environment")
+    print("  plainlang --help | -h             Show this help message")
+
+
 def main():
     args = sys.argv[1:]
+
+    if args and args[0].lower() in ("-h", "--help", "help"):
+        _print_help()
+        return
+
+    if args and args[0].lower() == "jarvis":
+        jarvis_main(args[1:])
+        return
+
     if len(args) >= 2 and args[0] == "-m":
         mod_name = args[1].lower()
         target_dir = args[2] if len(args) > 2 else "."
         if mod_name == "pvenv":
-            from .env_jarvis import ENV_DIR_NAME, ensure_pvenv
-
             base_root = os.path.abspath(target_dir)
             if os.path.basename(base_root).startswith(".") or os.path.basename(base_root) == ENV_DIR_NAME:
                 env_path = ensure_pvenv(os.path.dirname(base_root))
@@ -2252,8 +2273,6 @@ def main():
             print(f"Activate: & \"{os.path.join(env_path, 'Scripts', 'Activate.ps1')}\"")
             return
         if mod_name == "jarvis":
-            from .env_jarvis import jarvis_main
-
             jarvis_main(args[2:])
             return
 
@@ -2264,6 +2283,7 @@ def main():
         PlainLangStudio(target).start()
     else:
         PlainLangEngine().run_file(args[0])
-        
+
+
 if __name__ == "__main__":
     main()
